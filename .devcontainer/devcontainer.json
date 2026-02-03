@@ -9,9 +9,11 @@
     "initializeCommand": "xhost +local:docker",
     "containerEnv": {
         "DISPLAY": "${localEnv:DISPLAY}",
+        "XAUTHORITY": "${localEnv:XAUTHORITY}",
         "QT_X11_NO_MITSHM": "1",
         // NVIDIA related ENV variables make no difference
         // in case no discrete GPU is present in the system
+        "NVIDIA_VISIBLE_DEVICES": "all",
         "NVIDIA_DRIVER_CAPABILITIES": "all",
         "__NV_PRIME_RENDER_OFFLOAD": "1",
         "__GLX_VENDOR_LIBRARY_NAME": "nvidia"
@@ -59,6 +61,8 @@
     "runArgs": [
         "--ipc=host",
         "--net=host",
+        "--gpus", "all",
+        "--ulimit", "nofile=1024:524288",
         "--device-cgroup-rule", "c 81:* rmw",
         "--device-cgroup-rule", "c 189:* rmw",
         // "-v", "/dev/bus/usb:/dev/bus/usb"

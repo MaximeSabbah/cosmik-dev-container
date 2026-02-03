@@ -1,6 +1,6 @@
-# mmpose-dev-container
+# cosmik-dev-container
 
-Devcontainer setup for using with mmpose and ros noetic. (linked with panda_torque_mpc : https://gitlab.laas.fr/msabbah/panda_torque_mpc and rt-cosmik : https://gitlab.laas.fr/msabbah/rt-cosmik.git )
+Devcontainer setup for using with mmpose and ros noetic. (linked rt-cosmik : https://github.com/MaximeSabbah/RT-COSMIK.git)
 
 Befaure launching anything open the ports : `xhost +local:`
 
@@ -85,9 +85,3 @@ demo/resources/human-pose.jpg \
 --show \
 --dump-info  # dump sdk info
 ```
-
-# Ros ws
-Source deps_ws and do : `catkin build -j12 panda_torque_mpc`
-Then source /ros_ws/devel/setup.bash to use the package
-
-# Then you can normally make mmpose communicate with the ros controller 
