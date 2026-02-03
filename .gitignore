@@ -1,0 +1,4 @@
+.devcontainer/*/*
+!.devcontainer/scripts/*.sh
+vcs_repos
+pinocchio

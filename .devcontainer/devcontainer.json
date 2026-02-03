@@ -1,0 +1,98 @@
+{
+    "name": "gepetto-devcontainer",
+    // Uncomment ``build`` and comment out ``image`` to build from source
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "."
+    },
+    // "image": "gitlab.laas.fr:4567/kwojciecho/gepetto-dev-container:noetic"
+    "initializeCommand": "xhost +local:docker",
+    "containerEnv": {
+        "DISPLAY": "${localEnv:DISPLAY}",
+        "QT_X11_NO_MITSHM": "1",
+        // NVIDIA related ENV variables make no difference
+        // in case no discrete GPU is present in the system
+        "NVIDIA_DRIVER_CAPABILITIES": "all",
+        "__NV_PRIME_RENDER_OFFLOAD": "1",
+        "__GLX_VENDOR_LIBRARY_NAME": "nvidia"
+    },
+    "remoteUser": "gepetto",
+    "privileged": true,
+    "mounts": [
+        // Mount the workspace
+        {
+            "source": "${localWorkspaceFolder}/.devcontainer/scripts/build.sh",
+            "target": "/home/gepetto/ros_ws/build.sh",
+            "type": "bind"
+        },
+        {
+            "source": "${localWorkspaceFolder}/.devcontainer/scripts/setup.sh",
+            "target": "/home/gepetto/ros_ws/setup.sh",
+            "type": "bind"
+        },
+        // Enable sceen acess
+        {
+            "source": "/tmp/.X11-unix",
+            "target": "/tmp/.X11-unix",
+            "type": "bind"
+        },
+        {
+            "source": "/dev/dri",
+            "target": "/dev/dri",
+            "type": "bind"
+        },
+        {
+            "source": "${localEnv:XAUTHORITY}",
+            "target": "${localEnv:XAUTHORITY}",
+            "type": "bind"
+        },
+        // Presist bash history
+        {
+            "source": "${localWorkspaceFolderBasename}-bashhistory",
+            "target": "/commandhistory",
+            "type": "volume"
+        }
+
+    ],
+    "workspaceFolder": "/home/gepetto/ros_ws/src",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/gepetto/ros_ws/src,type=bind,consistency=cached",
+    "runArgs": [
+        "--ipc=host",
+        "--net=host",
+        "--device-cgroup-rule", "c 81:* rmw",
+        "--device-cgroup-rule", "c 189:* rmw",
+        // "-v", "/dev/bus/usb:/dev/bus/usb"
+        "-v", "/dev:/dev"
+    ],
+    "hostRequirements": {
+        "gpu": "optional"
+    },
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "bash"
+                    }
+                },
+                "terminal.integrated.defaultProfile.linux": "bash"
+            },
+            "extensions": [
+                "ms-vscode.cpptools-extension-pack",
+                "ms-python.python",
+                "ms-python.black-formatter",
+                "ms-python.isort",
+                "ms-toolsai.jupyter",
+                "ms-iot.vscode-ros",
+                "redhat.vscode-yaml",
+                "redhat.vscode-xml",
+                "twxs.cmake",
+                "ajshort.msg",
+                "xaver.clang-format",
+                "njpwerner.autodocstring",
+                "cschlosser.doxdocgen",
+                "streetsidesoftware.code-spell-checker"
+            ]
+        }
+    }
+}
