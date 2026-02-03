@@ -1,4 +1,7 @@
-.devcontainer/*/*
+*
 !.devcontainer/scripts/*.sh
-vcs_repos
-pinocchio
+!.vscode
+!.gitignore
+!.gitlab-ci.yml
+!.pre-commit-config.yaml
+!README.md
