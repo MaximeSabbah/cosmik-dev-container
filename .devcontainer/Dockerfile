@@ -128,7 +128,7 @@ RUN git clone https://github.com/casadi/casadi.git && \
     -DWITH_OPENMP=ON -DWITH_THREAD=ON \
     -DWITH_BUILD_MUMPS=ON -DWITH_BUILD_METIS=ON \
     -DWITH_PYTHON=ON -DWITH_PYTHON3=ON \
-    -DPYTHON_PREFIX=/root/workspace/mmdeploy/build/lib \
+    -DPYTHON_PREFIX=$(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())') \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
     -DCMAKE_BUILD_TYPE=Release 
 

@@ -18,7 +18,8 @@
         "__NV_PRIME_RENDER_OFFLOAD": "1",
         "__GLX_VENDOR_LIBRARY_NAME": "nvidia"
     },
-    "remoteUser": "gepetto",
+    "remoteUser": "root",
+    "onCreateCommand": "if ! id -u gepetto >/dev/null 2>&1; then groupadd --gid 1000 gepetto && useradd --uid 1000 --gid 1000 -m gepetto && echo \"gepetto ALL=(ALL) NOPASSWD:ALL\" > /etc/sudoers.d/gepetto && chmod 0440 /etc/sudoers.d/gepetto && mkdir -p /home/gepetto/ros_ws/src && chown -R gepetto:gepetto /home/gepetto; fi",
     "privileged": true,
     "mounts": [
         // Mount the workspace
