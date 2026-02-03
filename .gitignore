@@ -1,6 +1,7 @@
 *
 !.devcontainer/scripts/*.sh
 !.vscode
+!.envrc
 !.gitignore
 !.gitlab-ci.yml
 !.pre-commit-config.yaml
