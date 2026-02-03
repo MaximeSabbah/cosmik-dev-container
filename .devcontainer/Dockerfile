@@ -132,7 +132,7 @@ RUN git clone https://github.com/casadi/casadi.git && \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
     -DCMAKE_BUILD_TYPE=Release 
 
-RUN cd casadi/build && make -j$(nproc) && make install
+RUN cd casadi/build && make -j1 mumps-external && make -j$(nproc) && make install
 
 WORKDIR /root/workspace/ros_ws
 
