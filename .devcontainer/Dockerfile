@@ -16,10 +16,7 @@ RUN echo "deb [arch=amd64 signed-by=/robotpkg.gpg] http://robotpkg.openrobots.or
 RUN echo "deb [arch=amd64 signed-by=/robotpkg.gpg] http://robotpkg.openrobots.org/packages/debian/pub jammy robotpkg" >> /etc/apt/sources.list.d/robotpkg.list
 
 ENV PATH=/opt/openrobots/bin:${PATH}
-ENV PKG_CONFIG_PATH=/opt/openrobots/lib/pkgconfig:${PKG_CONFIG_PATH}
 ENV LD_LIBRARY_PATH=/opt/openrobots/lib:${LD_LIBRARY_PATH}
-ENV PYTHONPATH=/usr/local/lib/python3.10/site-packages:/opt/openrobots/lib/python3.10/site-packages:${PYTHONPATH}
-ENV CMAKE_PREFIX_PATH=/opt/openrobots:${CMAKE_PREFIX_PATH}
 
 # Install locales and other necessary tools
 RUN apt-get update \
