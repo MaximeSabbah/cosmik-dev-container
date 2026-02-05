@@ -71,7 +71,7 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     && python -m pip install --no-cache-dir --upgrade-strategy only-if-needed \
         argcomplete pre-commit \
         quadprog pyrealsense2 ultralytics opencv-python \
-        onnxruntime-gpu \
+        onnxruntime-gpu onnx \
         looseversion keyboard xacrodoc pynput \
     && python -m pip check
 
