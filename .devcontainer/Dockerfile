@@ -63,10 +63,12 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         robotpkg-py310-qt5-gepetto-viewer-corba \
         robotpkg-py310-pinocchio \
     && python -m pip install -U pip \
-    && python -m pip install \
+    # keep NumPy in 1.x so robotpkg pinocchio doesn't crash
+    && python -m pip install --no-cache-dir "numpy<2" \
+    && python -m pip install --no-cache-dir \
         --extra-index-url https://download.pytorch.org/whl/cu121 \
         "torch==2.4.1+cu121" "torchvision==0.19.1+cu121" "torchaudio==2.4.1+cu121" \
-    && python -m pip install -U \
+    && python -m pip install --no-cache-dir --upgrade-strategy only-if-needed \
         argcomplete pre-commit \
         quadprog pyrealsense2 ultralytics opencv-python \
         onnxruntime-gpu \
