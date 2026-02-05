@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
 SHELL ["/bin/bash", "-c"]
@@ -20,12 +21,13 @@ ENV LD_LIBRARY_PATH=/opt/openrobots/lib:${LD_LIBRARY_PATH}
 ENV PYTHONPATH=/usr/local/lib/python3.10/site-packages:/opt/openrobots/lib/python3.10/site-packages:${PYTHONPATH}
 ENV CMAKE_PREFIX_PATH=/opt/openrobots:${CMAKE_PREFIX_PATH}
 
-
 # Install locales and other necessary tools
-RUN apt-get update && \
-    apt-get install -y locales && \
-    locale-gen en_US.UTF-8 && \
-    update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      locales software-properties-common \
+      curl gnupg2 lsb-release ca-certificates \
+    && locale-gen en_US.UTF-8 \
+    && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 RUN add-apt-repository universe \
     && apt-get update \
@@ -51,82 +53,28 @@ RUN add-apt-repository universe \
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,sharing=locked,target=/root/.cache \
-    apt-get update \
+    set -euxo pipefail \
+    && apt-get update \
     && apt-get install -qqy --no-install-recommends \
-        # general dependencies
-        bash-completion \
-        build-essential \
-        clang-format \
-        ccache \
-        liburdfdom-tools \
-        usbutils \
-        cmake \
-        gdb \
-        git \
-        htop \
-        nano \
-        iputils-ping \
-        net-tools \
-        sudo \
-        wget \
-        vim \
-        v4l-utils \
-        # OpenCV / GUI runtime deps (libxcb.so.1, etc.)
-        libxcb1 \
-        libx11-6 \
-        libxext6 \
-        libxrender1 \
-        libxkbcommon0 \
-        libxfixes3 \
-        libxi6 \
-        libxrandr2 \
-        libxcursor1 \
-        libxcomposite1 \
-        libxdamage1 \
-        libglib2.0-0 \
-        libgl1 \
-        libsm6 \
-        libgtk-3-0 \
-        # TensorRT CLI tools
+        bash-completion build-essential cmake gdb git htop nano iputils-ping net-tools sudo wget vim v4l-utils \
+        clang-format ccache liburdfdom-tools usbutils \
+        libxcb1 libx11-6 libxext6 libxrender1 libxkbcommon0 libxfixes3 libxi6 libxrandr2 libxcursor1 libxcomposite1 libxdamage1 \
+        libglib2.0-0 libgl1 libsm6 libgtk-3-0 \
         libnvinfer-bin \
-        # gepetto-viewer 
+        gfortran liblapack-dev libblas-dev libopenblas-dev coinor-libipopt-dev swig pkg-config libmetis-dev libgmp-dev \
+        python3 python3-venv python3-distutils python3-dev python-is-python3 python3-flake8 python3-pip python3-setuptools ipython3 \
         robotpkg-py310-qt5-gepetto-viewer-corba \
-        #casadi dependencies
-        gfortran \
-        liblapack-dev \
-        libblas-dev \
-        libopenblas-dev \
-        coinor-libipopt-dev \
-        swig \
-        pkg-config \
-        libmetis-dev \
-        libgmp-dev \
-        # python
-        python3 \
-        python3-venv \
-        python3-distutils \
-        ipython3 \
-        python3-dev \
-        python-is-python3 \
-        python3-flake8 \
-        python3-pip \
-        python3-setuptools \
-        # pinocchio
         robotpkg-py310-pinocchio \
-        robotpkg-pinocchio \
+    && python -m pip install -U pip \
+    && python -m pip install \
+        --extra-index-url https://download.pytorch.org/whl/cu121 \
+        "torch==2.4.1+cu121" "torchvision==0.19.1+cu121" "torchaudio==2.4.1+cu121" \
     && python -m pip install -U \
-        torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121 \
-        argcomplete \
-        pre-commit \
-        quadprog \
-        pyrealsense2 \
-        ultralytics \
-        opencv-python \
-        onnxruntime \
-        looseversion \
-        keyboard \
-        xacrodoc \
-        pynput
+        argcomplete pre-commit \
+        quadprog pyrealsense2 ultralytics opencv-python \
+        onnxruntime-gpu \
+        looseversion keyboard xacrodoc pynput \
+    && python -m pip check
 
 # Backlog of the image 
 RUN mkdir -p /opt/manifest; \
