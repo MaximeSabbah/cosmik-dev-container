@@ -70,8 +70,8 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         "torch==2.4.1+cu121" "torchvision==0.19.1+cu121" "torchaudio==2.4.1+cu121" \
     && python -m pip install --no-cache-dir --upgrade-strategy only-if-needed \
         argcomplete pre-commit \
-        quadprog pyrealsense2 ultralytics opencv-python \
-        onnxruntime-gpu \
+        quadprog pyrealsense2 ultralytics opencv-python meshcat \
+        onnxruntime-gpu onnx \
         looseversion keyboard xacrodoc pynput \
     && python -m pip check
 
@@ -139,6 +139,10 @@ RUN git clone https://github.com/casadi/casadi.git; \
     make install
 
 WORKDIR /root/workspace
+
+RUN git clone https://github.com/MaximeSabbah/nlf_test.git /root/workspace/nlf_test \
+    && git clone https://github.com/MaximeSabbah/RT-COSMIK.git /root/workspace/ros_ws/RT-COSMIK
+
 
 RUN echo "export PATH=$PATH:/opt/openrobots/bin" >> /root/.bashrc; \
     echo "export PYTHONPATH=$PYTHONPATH:/opt/openrobots/lib/python3.10/site-packages:/usr/local/lib/python3.10/site-packages" >> /root/.bashrc; \
