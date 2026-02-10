@@ -168,7 +168,7 @@ RUN git clone https://github.com/stack-of-tasks/eigenpy.git; \
     ldconfig
 
 # -----------------------------------------------------------------------------
-# Build Pinocchio from source WITH CasADi + Python bindings (pinned)
+# Build Pinocchio from source WITH CasADi + Python bindings (pinned) + example_robot_data for cosmik
 # -----------------------------------------------------------------------------
 RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
     cd pinocchio; \
@@ -188,6 +188,17 @@ RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
       -DPython_EXECUTABLE=/usr/bin/python \
       -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
+
+RUN git clone --recursive https://github.com/Gepetto/example-robot-data.git; \
+    cd example-robot-data; \
+    git checkout fd8f0286c471af75fcff549cea83e9fbc11a0578; \
+    git submodule update --init --recursive; \
+    mkdir -p build; \
+    cd build; \
+    cmake ..; \
     make -j"$(nproc)"; \
     make install; \
     ldconfig
