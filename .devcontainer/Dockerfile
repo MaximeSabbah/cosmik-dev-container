@@ -55,10 +55,11 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         gfortran liblapack-dev libblas-dev libopenblas-dev coinor-libipopt-dev swig pkg-config libmetis-dev libgmp-dev \
         python3 python3-venv python3-distutils python3-dev python-is-python3 python3-flake8 python3-pip python3-setuptools ipython3 \
         \
-        # deps eigenpy/pinocchio (source build)
+        # deps eigenpy/hppfcl/pinocchio (source build)
         libeigen3-dev libboost-all-dev libboost-python-dev \
         liburdfdom-dev libconsole-bridge-dev libtinyxml2-dev \
         pybind11-dev \
+        libassimp-dev liboctomap-dev libqhull-dev \
     && rm -rf /var/lib/apt/lists/* \
     \
     # ---- pip constraints: force numpy<2 everywhere ----
@@ -168,8 +169,27 @@ RUN git clone https://github.com/stack-of-tasks/eigenpy.git; \
     ldconfig
 
 # -----------------------------------------------------------------------------
-# Build Pinocchio from source WITH CasADi + Python bindings (pinned) + example_robot_data for cosmik
+# Build Pinocchio from source WITH CasADi + Python bindings + HPP-FCL (pinned) + example_robot_data for cosmik
 # -----------------------------------------------------------------------------
+RUN git clone https://github.com/coal-library/coal.git; \
+    cd coal; \
+    git checkout v3.0.2; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DBUILD_PYTHON_INTERFACE=ON \
+      -DCOAL_BACKWARD_COMPATIBILITY_WITH_HPP_FCL=ON \
+      -DPYTHON_EXECUTABLE=/usr/bin/python \
+      -DPython_EXECUTABLE=/usr/bin/python \
+      -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
+      -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
+
 RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
     cd pinocchio; \
     git checkout v3.9.0; \
@@ -184,7 +204,7 @@ RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
       -DBUILD_BENCHMARK=OFF \
       -DBUILD_PYTHON_INTERFACE=ON \
       -DBUILD_WITH_CASADI_SUPPORT=ON \
-      -DBUILD_WITH_COLLISION_SUPPORT=OFF \
+      -DBUILD_WITH_COLLISION_SUPPORT=ON \
       -DPython_EXECUTABLE=/usr/bin/python \
       -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
