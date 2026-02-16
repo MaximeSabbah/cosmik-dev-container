@@ -85,9 +85,11 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         # ros dependencies
         python3-vcstool \
         python3-catkin-tools \
-        # pinocchio
-        robotpkg-py38-pinocchio \
-        robotpkg-pinocchio \
+        # deps eigenpy/hppfcl/pinocchio (source build)
+        libeigen3-dev libboost-all-dev libboost-python-dev \
+        liburdfdom-dev libconsole-bridge-dev libtinyxml2-dev \
+        pybind11-dev \
+        libassimp-dev liboctomap-dev libqhull-dev \
     && python -m pip install -U \
         argcomplete \
         pre-commit \
@@ -99,42 +101,126 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         xacrodoc \
         pynput
 
-# Build and install BLASFEO
-RUN git clone https://github.com/giaf/blasfeo.git && \
-    mkdir blasfeo/build && cd blasfeo/build && \
+# -----------------------------------------------------------------------------
+# Workspace layout
+# -----------------------------------------------------------------------------
+RUN mkdir -p /root/workspace/deps /root/workspace/ros_ws
+WORKDIR /root/workspace
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc
+
+# -----------------------------------------------------------------------------
+# Build BLASFEO, FATROP, CasADi from source (installed into /usr/local)
+# -----------------------------------------------------------------------------
+WORKDIR /root/workspace/deps
+
+RUN git clone https://github.com/giaf/blasfeo.git; \
+    cd blasfeo; \
+    git checkout 9923ac8a63d710d894a3d2987d885002df69db74; \
+    mkdir -p build; \
+    cd build; \
     cmake .. \
-    -DTARGET=X64_AUTOMATIC \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DCMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc) && make install
+      -DTARGET=X64_AUTOMATIC \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
 
-# Build and install FATROP at specific commit
-RUN git clone https://github.com/meco-group/fatrop.git && \
-    mkdir fatrop/build && cd fatrop/build && \
-    git checkout 45ee388750ba2b4cf7ba603203d4c12431e485fe && \
+RUN git clone https://github.com/meco-group/fatrop.git; \
+    cd fatrop; \
+    git checkout 45ee388750ba2b4cf7ba603203d4c12431e485fe; \
+    mkdir -p build; \
+    cd build; \
     cmake .. \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_TESTS=OFF && \
-    make -j$(nproc) && make install
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTS=OFF; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
 
-# Build and install CasADi at specific version
-RUN git clone https://github.com/casadi/casadi.git && \
-    mkdir casadi/build && cd casadi/build && \
-    git checkout 3.7.2 && \
+RUN git clone https://github.com/casadi/casadi.git; \
+    cd casadi; \
+    git checkout 3.7.2; \
+    mkdir -p build; \
+    cd build; \
     cmake .. \
-    -DWITH_IPOPT=ON -DWITH_BUILD_IPOPT=ON \
-    -DWITH_FATROP=ON\
-    -DWITH_OPENMP=ON -DWITH_THREAD=ON \
-    -DWITH_BUILD_MUMPS=ON -DWITH_BUILD_METIS=ON \
-    -DWITH_PYTHON=ON -DWITH_PYTHON3=ON \
-    -DPYTHON_PREFIX=$(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())') \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DCMAKE_BUILD_TYPE=Release 
+      -DWITH_IPOPT=ON -DWITH_BUILD_IPOPT=ON \
+      -DWITH_FATROP=ON \
+      -DWITH_OPENMP=ON -DWITH_THREAD=ON \
+      -DWITH_BUILD_MUMPS=ON -DWITH_BUILD_METIS=ON \
+      -DWITH_PYTHON=ON -DWITH_PYTHON3=ON \
+      -DPYTHON_PREFIX="$(python -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())')" \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release; \
+    make -j1 mumps-external; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
 
-RUN cd casadi/build && make -j1 mumps-external && make -j$(nproc) && make install
+# -----------------------------------------------------------------------------
+# Build eigenpy from source (pinned) -> installs /usr/local/lib{,64}/cmake/eigenpy + libeigenpy.so
+# -----------------------------------------------------------------------------
+RUN git clone https://github.com/stack-of-tasks/eigenpy.git; \
+    cd eigenpy; \
+    git checkout v3.12.0; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DPython_EXECUTABLE=/usr/bin/python \
+      -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
 
-WORKDIR /root/workspace/ros_ws
+# -----------------------------------------------------------------------------
+# Build Pinocchio from source WITH CasADi + Python bindings + HPP-FCL (pinned) + example_robot_data for cosmik
+# -----------------------------------------------------------------------------
+RUN git clone https://github.com/coal-library/coal.git; \
+    cd coal; \
+    git checkout v3.0.2; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DBUILD_PYTHON_INTERFACE=ON \
+      -DCOAL_BACKWARD_COMPATIBILITY_WITH_HPP_FCL=ON \
+      -DPYTHON_EXECUTABLE=/usr/bin/python \
+      -DPython_EXECUTABLE=/usr/bin/python \
+      -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
+      -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
+
+RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
+    cd pinocchio; \
+    git checkout v3.9.0; \
+    git submodule update --init --recursive; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DBUILD_EXAMPLES=OFF \
+      -DBUILD_BENCHMARK=OFF \
+      -DBUILD_PYTHON_INTERFACE=ON \
+      -DBUILD_WITH_CASADI_SUPPORT=ON \
+      -DBUILD_WITH_COLLISION_SUPPORT=ON \
+      -DPython_EXECUTABLE=/usr/bin/python \
+      -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
+      -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(nproc)"; \
+    make install; \
+    ldconfig
+
+WORKDIR /root/workspace
 
 RUN git clone https://github.com/open-mmlab/mmpose.git /root/workspace/mmpose
 
