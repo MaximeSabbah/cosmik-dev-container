@@ -279,7 +279,7 @@ RUN echo "export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.10/site-packages"
     echo "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH" >> /root/.bashrc && \
     echo "export LIBRARY_PATH=/usr/local/lib:\$LIBRARY_PATH" >> /root/.bashrc && \
     echo "export CPATH=/usr/local/include:\$CPATH" >> /root/.bashrc && \
-    echo "export ACADOS_SOURCE_DIR=/root/workspace/deps/acados" >> /root/.bashrc && \    
+    echo "export ACADOS_SOURCE_DIR=/root/workspace/deps/acados" >> /root/.bashrc && \
     echo "export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:\$PKG_CONFIG_PATH" >> /root/.bashrc
 
 CMD ["bash"]
