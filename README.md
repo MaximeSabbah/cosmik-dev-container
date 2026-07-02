@@ -1,6 +1,6 @@
 # cosmik-dev-container
 
-Devcontainer setup for using with mmpose and ros noetic. (linked rt-cosmik : https://github.com/MaximeSabbah/RT-COSMIK.git)
+Devcontainer setup for using with nlf and ros2_humble. (linked rt-cosmik : https://github.com/MaximeSabbah/RT-COSMIK.git)
 
 Befaure launching anything open the ports : `xhost +local:`
 
