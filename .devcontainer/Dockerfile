@@ -272,7 +272,16 @@ ENV ACADOS_SOURCE_DIR=/root/workspace/deps/acados
 
 WORKDIR /root/workspace
 
-RUN git clone https://github.com/MaximeSabbah/nlf_test.git /root/workspace/nlf_test
+RUN git clone https://github.com/MaximeSabbah/nlf_test.git /root/workspace/nlf_test \
+    && git clone https://github.com/MaximeSabbah/RT-COSMIK.git /root/workspace/ros_ws/RT-COSMIK
+
+
+RUN echo "export PATH=$PATH:/opt/openrobots/bin" >> /root/.bashrc; \
+    echo "export PYTHONPATH=$PYTHONPATH:/opt/openrobots/lib/python3.10/site-packages:/usr/local/lib/python3.10/site-packages" >> /root/.bashrc; \
+    echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/openrobots/lib:/usr/local/lib" >> /root/.bashrc; \
+    echo "export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH" >> /root/.bashrc; \
+    echo "export CPATH=/usr/local/include:$CPATH" >> /root/.bashrc; \
+    echo "export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/openrobots/lib/pkgconfig:/usr/local/lib/pkgconfig" >> /root/.bashrc
 
 # Env helpers (minimal; Python already sees /usr/local site-packages by default)
 RUN echo "export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.10/site-packages" >> /root/.bashrc && \
