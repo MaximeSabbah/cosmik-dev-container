@@ -101,6 +101,19 @@ WORKDIR /root/workspace
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc
 
 # -----------------------------------------------------------------------------
+# Build-job limiter: min(nproc-4, RAM/3GB). The heavy template compiles below
+# (eigenpy/pinocchio/casadi/coal) are MEMORY-bound (~2-4 GB per job); limiting by
+# cores alone OOM-freezes machines with modest RAM. Used as make -j"$(build_jobs)".
+# -----------------------------------------------------------------------------
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'cpu=$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))' \
+    'mem=$(( $(grep MemTotal /proc/meminfo | tr -dc 0-9) / 3145728 ))' \
+    '[ "$mem" -lt 1 ] && mem=1' \
+    'echo "$(( cpu < mem ? cpu : mem ))"' \
+    > /usr/local/bin/build_jobs && chmod +x /usr/local/bin/build_jobs
+
+# -----------------------------------------------------------------------------
 # Build BLASFEO, FATROP, CasADi from source (installed into /usr/local)
 # -----------------------------------------------------------------------------
 WORKDIR /root/workspace/deps
@@ -114,7 +127,7 @@ RUN git clone https://github.com/giaf/blasfeo.git; \
       -DTARGET=X64_AUTOMATIC \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
+    make -j"$(build_jobs)"; \
     make install; \
     ldconfig
 
@@ -127,7 +140,7 @@ RUN git clone https://github.com/meco-group/fatrop.git; \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTS=OFF; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
+    make -j"$(build_jobs)"; \
     make install; \
     ldconfig
 
@@ -146,7 +159,7 @@ RUN git clone https://github.com/casadi/casadi.git; \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release; \
     make -j1 mumps-external; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
+    make -j"$(build_jobs)"; \
     make install; \
     ldconfig
 
@@ -164,7 +177,7 @@ RUN git clone https://github.com/stack-of-tasks/eigenpy.git; \
       -DBUILD_TESTING=OFF \
       -DPython_EXECUTABLE=/usr/bin/python \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
+    make -j"$(build_jobs)"; \
     make install; \
     ldconfig
 
@@ -186,7 +199,7 @@ RUN git clone https://github.com/coal-library/coal.git; \
       -DPython_EXECUTABLE=/usr/bin/python \
       -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
+    make -j"$(build_jobs)"; \
     make install; \
     ldconfig
 
@@ -208,7 +221,7 @@ RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
       -DPython_EXECUTABLE=/usr/bin/python \
       -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
+    make -j"$(build_jobs)"; \
     make install; \
     ldconfig
 
@@ -219,7 +232,7 @@ RUN git clone --recursive https://github.com/Gepetto/example-robot-data.git; \
     mkdir -p build; \
     cd build; \
     cmake ..; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
+    make -j"$(build_jobs)"; \
     make install; \
     ldconfig
 
@@ -238,7 +251,7 @@ RUN git clone https://github.com/acados/acados.git; \
       -DACADOS_WITH_OPENMP=OFF \
       -DBLASFEO_TARGET=X64_AUTOMATIC \
       -DCMAKE_BUILD_TYPE=Release; \
-    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))" install; \
+    make -j"$(build_jobs)" install; \
     echo "/root/workspace/deps/acados/lib" > /etc/ld.so.conf.d/acados.conf; \
     ldconfig
 
