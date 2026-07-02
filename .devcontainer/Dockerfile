@@ -77,7 +77,7 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     # the rest (also constrained)
     && python -m pip install -c /tmp/constraints.txt --upgrade-strategy only-if-needed \
         argcomplete pre-commit \
-        quadprog pyrealsense2 ultralytics opencv-python meshcat \
+        quadprog pyrealsense2 ultralytics opencv-python meshcat pandas \
         onnxruntime-gpu onnx \
         looseversion keyboard xacrodoc pynput \
     && python -m pip check \
@@ -222,6 +222,40 @@ RUN git clone --recursive https://github.com/Gepetto/example-robot-data.git; \
     make -j"$(nproc)"; \
     make install; \
     ldconfig
+
+# -----------------------------------------------------------------------------
+# Build acados from source (MHE-IK "acados" backend) + Python template + tera.
+# Pinned to the commit validated with RT-COSMIK (v0.5.4-20-g8e1a6f856).
+# -----------------------------------------------------------------------------
+RUN git clone https://github.com/acados/acados.git; \
+    cd acados; \
+    git checkout 8e1a6f856e063c423de583e03c691e3b2b7fc0a0; \
+    git submodule update --init --recursive; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DACADOS_INSTALL_DIR=/root/workspace/deps/acados \
+      -DACADOS_WITH_OPENMP=OFF \
+      -DBLASFEO_TARGET=X64_AUTOMATIC \
+      -DCMAKE_BUILD_TYPE=Release; \
+    make -j"$(nproc)" install; \
+    echo "/root/workspace/deps/acados/lib" > /etc/ld.so.conf.d/acados.conf; \
+    ldconfig
+
+# tera renderer (acados codegen template engine) — download non-interactively
+RUN mkdir -p /root/workspace/deps/acados/bin; \
+    curl -fsSL -o /root/workspace/deps/acados/bin/t_renderer \
+      https://github.com/acados/tera_renderer/releases/download/v0.2.0/t_renderer-v0.2.0-linux-amd64; \
+    chmod +x /root/workspace/deps/acados/bin/t_renderer
+
+# acados Python interface. --no-deps is CRITICAL: it prevents pip from pulling a
+# casadi wheel that would shadow the from-source casadi and break pinocchio.casadi.
+# Its other deps (numpy/scipy already present) are installed explicitly.
+RUN python -m pip install -c /tmp/constraints.txt matplotlib cython Deprecated; \
+    python -m pip install --no-deps -e /root/workspace/deps/acados/interfaces/acados_template; \
+    python -c "import acados_template; print('acados_template OK')"
+
+ENV ACADOS_SOURCE_DIR=/root/workspace/deps/acados
 
 WORKDIR /root/workspace
 
