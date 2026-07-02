@@ -10,14 +10,6 @@ ENV LANG=en_US.UTF-8 \
     ROS_DISTRO=humble \
     DEBIAN_FRONTEND=noninteractive
 
-# robotpkg 
-ADD --chmod=644 http://robotpkg.openrobots.org/packages/debian/robotpkg.gpg /robotpkg.gpg
-RUN echo "deb [arch=amd64 signed-by=/robotpkg.gpg] http://robotpkg.openrobots.org/wip/packages/debian/pub jammy robotpkg" >> /etc/apt/sources.list.d/robotpkg.list
-RUN echo "deb [arch=amd64 signed-by=/robotpkg.gpg] http://robotpkg.openrobots.org/packages/debian/pub jammy robotpkg" >> /etc/apt/sources.list.d/robotpkg.list
-
-ENV PATH=/opt/openrobots/bin:${PATH}
-ENV LD_LIBRARY_PATH=/opt/openrobots/lib:${LD_LIBRARY_PATH}
-
 # Install locales and other necessary tools
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -46,13 +38,15 @@ RUN add-apt-repository universe \
     && rosdep init \
     && rosdep update
 
-# Install required packages
+# -----------------------------------------------------------------------------
+# System deps + pip deps (with constraints to prevent numpy 2.x)
+# -----------------------------------------------------------------------------
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     --mount=type=cache,sharing=locked,target=/var/lib/apt \
     --mount=type=cache,sharing=locked,target=/root/.cache \
     set -euxo pipefail \
     && apt-get update \
-    && apt-get install -qqy --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
         bash-completion build-essential cmake gdb git htop nano iputils-ping net-tools sudo wget vim v4l-utils \
         clang-format ccache liburdfdom-tools usbutils \
         libxcb1 libx11-6 libxext6 libxrender1 libxkbcommon0 libxfixes3 libxi6 libxrandr2 libxcursor1 libxcomposite1 libxdamage1 \
@@ -60,41 +54,69 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         libnvinfer-bin \
         gfortran liblapack-dev libblas-dev libopenblas-dev coinor-libipopt-dev swig pkg-config libmetis-dev libgmp-dev \
         python3 python3-venv python3-distutils python3-dev python-is-python3 python3-flake8 python3-pip python3-setuptools ipython3 \
-        robotpkg-py310-qt5-gepetto-viewer-corba \
-        robotpkg-py310-pinocchio \
+        \
+        # deps eigenpy/hppfcl/pinocchio (source build)
+        libeigen3-dev libboost-all-dev libboost-python-dev \
+        liburdfdom-dev libconsole-bridge-dev libtinyxml2-dev \
+        pybind11-dev \
+        libassimp-dev liboctomap-dev libqhull-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    \
+    # ---- pip constraints: force numpy<2 everywhere ----
     && python -m pip install -U pip \
-    # keep NumPy in 1.x so robotpkg pinocchio doesn't crash
-    && python -m pip install --no-cache-dir "numpy<2" \
-    && python -m pip install --no-cache-dir \
+    && printf "numpy==1.26.4\n" > /tmp/constraints.txt \
+    \
+    # install numpy first (pinned by constraints)
+    && python -m pip install -c /tmp/constraints.txt "numpy==1.26.4" \
+    \
+    # torch stack
+    && python -m pip install -c /tmp/constraints.txt \
         --extra-index-url https://download.pytorch.org/whl/cu121 \
         "torch==2.4.1+cu121" "torchvision==0.19.1+cu121" "torchaudio==2.4.1+cu121" \
-    && python -m pip install --no-cache-dir --upgrade-strategy only-if-needed \
+    \
+    # the rest (also constrained)
+    && python -m pip install -c /tmp/constraints.txt --upgrade-strategy only-if-needed \
         argcomplete pre-commit \
-        quadprog pyrealsense2 ultralytics opencv-python meshcat \
+        quadprog pyrealsense2 ultralytics opencv-python meshcat pandas \
         onnxruntime-gpu onnx \
         looseversion keyboard xacrodoc pynput \
-    && python -m pip check
+    && python -m pip check \
+    \
+    # sanity: make sure numpy is <2 right now
+    && python -c "import numpy as np; assert int(np.__version__.split('.')[0]) < 2, np.__version__; print('numpy ok:', np.__version__, np.__file__)"
 
-# Backlog of the image 
+# -----------------------------------------------------------------------------
+# Backlog of the image
+# -----------------------------------------------------------------------------
 RUN mkdir -p /opt/manifest; \
   python -m pip freeze > /opt/manifest/pip_freeze.txt; \
   dpkg-query -W > /opt/manifest/dpkg.txt; \
   apt-mark showmanual > /opt/manifest/apt_manual.txt
 
 # -----------------------------------------------------------------------------
-# Workspace layout (as you liked)
+# Workspace layout
 # -----------------------------------------------------------------------------
-RUN mkdir -p /root/workspace/src /root/workspace/ros_ws
+RUN mkdir -p /root/workspace/deps /root/workspace/ros_ws
 WORKDIR /root/workspace
-
-# Source ROS 2 + openrobots env by default in interactive shells
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc; \
-    echo "source /etc/profile.d/openrobots.sh" >> /root/.bashrc
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc
 
 # -----------------------------------------------------------------------------
-# Build BLASFEO, FATROP, CasADi from source (installed into /usr/local + venv)
+# Build-job limiter: min(nproc-4, RAM/3GB). The heavy template compiles below
+# (eigenpy/pinocchio/casadi/coal) are MEMORY-bound (~2-4 GB per job); limiting by
+# cores alone OOM-freezes machines with modest RAM. Used as make -j"$(build_jobs)".
 # -----------------------------------------------------------------------------
-WORKDIR /root/workspace/src
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'cpu=$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))' \
+    'mem=$(( $(grep MemAvailable /proc/meminfo | tr -dc 0-9) / 4194304 ))' \
+    '[ "$mem" -lt 1 ] && mem=1' \
+    'echo "$(( cpu < mem ? cpu : mem ))"' \
+    > /usr/local/bin/build_jobs && chmod +x /usr/local/bin/build_jobs
+
+# -----------------------------------------------------------------------------
+# Build BLASFEO, FATROP, CasADi from source (installed into /usr/local)
+# -----------------------------------------------------------------------------
+WORKDIR /root/workspace/deps
 
 RUN git clone https://github.com/giaf/blasfeo.git; \
     cd blasfeo; \
@@ -105,8 +127,9 @@ RUN git clone https://github.com/giaf/blasfeo.git; \
       -DTARGET=X64_AUTOMATIC \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release; \
-    make -j"$(nproc)"; \
-    make install
+    make -j"$(build_jobs)"; \
+    make install; \
+    ldconfig
 
 RUN git clone https://github.com/meco-group/fatrop.git; \
     cd fatrop; \
@@ -117,8 +140,9 @@ RUN git clone https://github.com/meco-group/fatrop.git; \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTS=OFF; \
-    make -j"$(nproc)"; \
-    make install
+    make -j"$(build_jobs)"; \
+    make install; \
+    ldconfig
 
 RUN git clone https://github.com/casadi/casadi.git; \
     cd casadi; \
@@ -135,8 +159,116 @@ RUN git clone https://github.com/casadi/casadi.git; \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release; \
     make -j1 mumps-external; \
-    make -j"$(nproc)"; \
-    make install
+    make -j"$(build_jobs)"; \
+    make install; \
+    ldconfig
+
+# -----------------------------------------------------------------------------
+# Build eigenpy from source (pinned) -> installs /usr/local/lib{,64}/cmake/eigenpy + libeigenpy.so
+# -----------------------------------------------------------------------------
+RUN git clone https://github.com/stack-of-tasks/eigenpy.git; \
+    cd eigenpy; \
+    git checkout v3.12.0; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DPython_EXECUTABLE=/usr/bin/python \
+      -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(build_jobs)"; \
+    make install; \
+    ldconfig
+
+# -----------------------------------------------------------------------------
+# Build Pinocchio from source WITH CasADi + Python bindings + HPP-FCL (pinned) + example_robot_data for cosmik
+# -----------------------------------------------------------------------------
+RUN git clone https://github.com/coal-library/coal.git; \
+    cd coal; \
+    git checkout v3.0.2; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DBUILD_PYTHON_INTERFACE=ON \
+      -DCOAL_BACKWARD_COMPATIBILITY_WITH_HPP_FCL=ON \
+      -DPYTHON_EXECUTABLE=/usr/bin/python \
+      -DPython_EXECUTABLE=/usr/bin/python \
+      -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
+      -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(build_jobs)"; \
+    make install; \
+    ldconfig
+
+RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
+    cd pinocchio; \
+    git checkout v3.9.0; \
+    git submodule update --init --recursive; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DBUILD_EXAMPLES=OFF \
+      -DBUILD_BENCHMARK=OFF \
+      -DBUILD_PYTHON_INTERFACE=ON \
+      -DBUILD_WITH_CASADI_SUPPORT=ON \
+      -DBUILD_WITH_COLLISION_SUPPORT=ON \
+      -DPython_EXECUTABLE=/usr/bin/python \
+      -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
+      -DCMAKE_PREFIX_PATH="/usr/local"; \
+    make -j"$(build_jobs)"; \
+    make install; \
+    ldconfig
+
+RUN git clone --recursive https://github.com/Gepetto/example-robot-data.git; \
+    cd example-robot-data; \
+    git checkout fd8f0286c471af75fcff549cea83e9fbc11a0578; \
+    git submodule update --init --recursive; \
+    mkdir -p build; \
+    cd build; \
+    cmake ..; \
+    make -j"$(build_jobs)"; \
+    make install; \
+    ldconfig
+
+# -----------------------------------------------------------------------------
+# Build acados from source (MHE-IK "acados" backend) + Python template + tera.
+# Pinned to the commit validated with RT-COSMIK (v0.5.4-20-g8e1a6f856).
+# -----------------------------------------------------------------------------
+RUN git clone https://github.com/acados/acados.git; \
+    cd acados; \
+    git checkout 8e1a6f856e063c423de583e03c691e3b2b7fc0a0; \
+    git submodule update --init --recursive; \
+    mkdir -p build; \
+    cd build; \
+    cmake .. \
+      -DACADOS_INSTALL_DIR=/root/workspace/deps/acados \
+      -DACADOS_WITH_OPENMP=OFF \
+      -DBLASFEO_TARGET=X64_AUTOMATIC \
+      -DCMAKE_BUILD_TYPE=Release; \
+    make -j"$(build_jobs)" install; \
+    echo "/root/workspace/deps/acados/lib" > /etc/ld.so.conf.d/acados.conf; \
+    ldconfig
+
+# tera renderer (acados codegen template engine) — download non-interactively
+RUN mkdir -p /root/workspace/deps/acados/bin; \
+    curl -fsSL -o /root/workspace/deps/acados/bin/t_renderer \
+      https://github.com/acados/tera_renderer/releases/download/v0.2.0/t_renderer-v0.2.0-linux-amd64; \
+    chmod +x /root/workspace/deps/acados/bin/t_renderer
+
+# acados Python interface. --no-deps is CRITICAL: it prevents pip from pulling a
+# casadi wheel that would shadow the from-source casadi and break pinocchio.casadi.
+# Its other deps (numpy/scipy already present) are installed explicitly.
+RUN python -m pip install -c /tmp/constraints.txt matplotlib cython Deprecated; \
+    python -m pip install --no-deps -e /root/workspace/deps/acados/interfaces/acados_template; \
+    python -c "import acados_template; print('acados_template OK')"
+
+ENV ACADOS_SOURCE_DIR=/root/workspace/deps/acados
 
 WORKDIR /root/workspace
 
@@ -150,5 +282,13 @@ RUN echo "export PATH=$PATH:/opt/openrobots/bin" >> /root/.bashrc; \
     echo "export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH" >> /root/.bashrc; \
     echo "export CPATH=/usr/local/include:$CPATH" >> /root/.bashrc; \
     echo "export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/openrobots/lib/pkgconfig:/usr/local/lib/pkgconfig" >> /root/.bashrc
+
+# Env helpers (minimal; Python already sees /usr/local site-packages by default)
+RUN echo "export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.10/site-packages" >> /root/.bashrc && \
+    echo "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH" >> /root/.bashrc && \
+    echo "export LIBRARY_PATH=/usr/local/lib:\$LIBRARY_PATH" >> /root/.bashrc && \
+    echo "export CPATH=/usr/local/include:\$CPATH" >> /root/.bashrc && \
+    echo "export ACADOS_SOURCE_DIR=/root/workspace/deps/acados" >> /root/.bashrc && \
+    echo "export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:\$PKG_CONFIG_PATH" >> /root/.bashrc
 
 CMD ["bash"]
