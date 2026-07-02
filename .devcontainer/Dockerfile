@@ -114,7 +114,7 @@ RUN git clone https://github.com/giaf/blasfeo.git; \
       -DTARGET=X64_AUTOMATIC \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release; \
-    make -j"$(nproc)"; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
     make install; \
     ldconfig
 
@@ -127,7 +127,7 @@ RUN git clone https://github.com/meco-group/fatrop.git; \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTS=OFF; \
-    make -j"$(nproc)"; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
     make install; \
     ldconfig
 
@@ -146,7 +146,7 @@ RUN git clone https://github.com/casadi/casadi.git; \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release; \
     make -j1 mumps-external; \
-    make -j"$(nproc)"; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
     make install; \
     ldconfig
 
@@ -164,7 +164,7 @@ RUN git clone https://github.com/stack-of-tasks/eigenpy.git; \
       -DBUILD_TESTING=OFF \
       -DPython_EXECUTABLE=/usr/bin/python \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
-    make -j"$(nproc)"; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
     make install; \
     ldconfig
 
@@ -186,7 +186,7 @@ RUN git clone https://github.com/coal-library/coal.git; \
       -DPython_EXECUTABLE=/usr/bin/python \
       -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
-    make -j"$(nproc)"; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
     make install; \
     ldconfig
 
@@ -208,7 +208,7 @@ RUN git clone --recursive https://github.com/stack-of-tasks/pinocchio.git; \
       -DPython_EXECUTABLE=/usr/bin/python \
       -Deigenpy_DIR=/usr/local/lib/cmake/eigenpy \
       -DCMAKE_PREFIX_PATH="/usr/local"; \
-    make -j"$(nproc)"; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
     make install; \
     ldconfig
 
@@ -219,7 +219,7 @@ RUN git clone --recursive https://github.com/Gepetto/example-robot-data.git; \
     mkdir -p build; \
     cd build; \
     cmake ..; \
-    make -j"$(nproc)"; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))"; \
     make install; \
     ldconfig
 
@@ -238,7 +238,7 @@ RUN git clone https://github.com/acados/acados.git; \
       -DACADOS_WITH_OPENMP=OFF \
       -DBLASFEO_TARGET=X64_AUTOMATIC \
       -DCMAKE_BUILD_TYPE=Release; \
-    make -j"$(nproc)" install; \
+    make -j"$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))" install; \
     echo "/root/workspace/deps/acados/lib" > /etc/ld.so.conf.d/acados.conf; \
     ldconfig
 
