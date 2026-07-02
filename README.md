@@ -2,7 +2,7 @@
 
 Devcontainer setup for using with nlf and ros2_humble. (linked rt-cosmik : https://github.com/MaximeSabbah/RT-COSMIK.git)
 
-Befaure launching anything open the ports : `xhost +local:`
+Before launching anything open the ports : `xhost +local:`
 
 Commands to run to launch the devcontainer : 
 in .devcontainer do : `docker build -t mmpose_image .`
