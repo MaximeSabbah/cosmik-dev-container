@@ -108,7 +108,7 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc
 RUN printf '%s\n' \
     '#!/bin/bash' \
     'cpu=$(( $(nproc) > 4 ? $(nproc) - 4 : 1 ))' \
-    'mem=$(( $(grep MemTotal /proc/meminfo | tr -dc 0-9) / 3145728 ))' \
+    'mem=$(( $(grep MemAvailable /proc/meminfo | tr -dc 0-9) / 4194304 ))' \
     '[ "$mem" -lt 1 ] && mem=1' \
     'echo "$(( cpu < mem ? cpu : mem ))"' \
     > /usr/local/bin/build_jobs && chmod +x /usr/local/bin/build_jobs
